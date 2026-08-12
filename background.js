@@ -135,6 +135,8 @@ function summarizeProfile(profile) {
   const p = profile.personal || {};
   const lines = [];
   lines.push(`Name: ${p.fullName || `${p.firstName || ""} ${p.lastName || ""}`.trim()}`);
+  const location = [p.city, p.state, p.country].filter(Boolean).join(", ");
+  if (location) lines.push(`Current location: ${location} — use this exact location for any "where are you based" / "current city" style question, never a school or employer's city.`);
   if (profile.headline) lines.push(`Headline: ${profile.headline}`);
   if (Array.isArray(profile.education) && profile.education.length) {
     lines.push("Education:");
