@@ -1,0 +1,164 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Resume Autofill AI — Settings</title>
+  <link rel="stylesheet" href="options.css" />
+</head>
+<body>
+  <div class="shell">
+    <nav class="sidebar">
+      <h1>Resume Autofill</h1>
+      <button class="nav-item active" data-tab="personal">Personal Info</button>
+      <button class="nav-item" data-tab="education">Education</button>
+      <button class="nav-item" data-tab="projects">Projects &amp; Experience</button>
+      <button class="nav-item" data-tab="skills">Skills</button>
+      <button class="nav-item" data-tab="preferences">Application Preferences</button>
+      <button class="nav-item" data-tab="templates">Answer Style Templates</button>
+      <button class="nav-item" data-tab="ai">AI Settings</button>
+      <div class="save-row">
+        <button id="saveBtn" class="primary-btn">Save changes</button>
+        <span id="saveStatus" class="save-status"></span>
+        <button id="exportBtn" class="secondary-btn">Export backup (JSON)</button>
+        <button id="importBtn" class="secondary-btn">Import backup</button>
+        <input id="importFile" type="file" accept="application/json" hidden />
+        <span id="importStatus" class="save-status"></span>
+      </div>
+    </nav>
+
+    <main>
+      <section id="tab-personal" class="tab">
+        <h2>Personal Info</h2>
+        <div class="grid2">
+          <label>First name<input id="firstName" /></label>
+          <label>Last name<input id="lastName" /></label>
+          <label>Full name (as it should appear)<input id="fullName" /></label>
+          <label>Email<input id="email" type="email" /></label>
+          <label>Phone<input id="phone" /></label>
+          <label>Address line 1<input id="address1" /></label>
+          <label>City<input id="city" /></label>
+          <label>State / Province<input id="state" /></label>
+          <label>ZIP / Postal code<input id="zip" /></label>
+          <label>Country<input id="country" /></label>
+          <label>Current company<input id="currentCompany" /></label>
+          <label>Current title<input id="currentTitle" /></label>
+        </div>
+        <h3>Links</h3>
+        <div class="grid2">
+          <label>LinkedIn URL<input id="linkedin" /></label>
+          <label>GitHub URL<input id="github" /></label>
+          <label>Portfolio / website URL<input id="portfolio" /></label>
+        </div>
+        <h3>Headline / summary</h3>
+        <label>Short professional summary (used as LLM context)
+          <textarea id="headline" rows="3"></textarea>
+        </label>
+      </section>
+
+      <section id="tab-education" class="tab hidden">
+        <h2>Education</h2>
+        <div id="educationList"></div>
+        <button class="add-btn" data-add="education">+ Add education entry</button>
+      </section>
+
+      <section id="tab-projects" class="tab hidden">
+        <h2>Experience</h2>
+        <div id="experienceList"></div>
+        <button class="add-btn" data-add="experience">+ Add experience entry</button>
+
+        <h2>Projects</h2>
+        <div id="projectsList"></div>
+        <button class="add-btn" data-add="projects">+ Add project</button>
+
+        <h2>Activities &amp; Leadership</h2>
+        <p class="hint">Positions of responsibility, clubs, volunteering — used as context for "leadership" or "extracurricular" style questions.</p>
+        <div id="activitiesList"></div>
+        <button class="add-btn" data-add="activities">+ Add activity / position</button>
+      </section>
+
+      <section id="tab-skills" class="tab hidden">
+        <h2>Skills</h2>
+        <p class="hint">Comma-separated. Used both for skills sections and as LLM context.</p>
+        <label>Languages &amp; tools<textarea id="skillsLanguagesTools" rows="2"></textarea></label>
+        <label>AI &amp; ML<textarea id="skillsAiMl" rows="2"></textarea></label>
+        <label>Soft skills<textarea id="skillsSoft" rows="2"></textarea></label>
+      </section>
+
+      <section id="tab-preferences" class="tab hidden">
+        <h2>Application Preferences</h2>
+        <div class="grid2">
+          <label>Desired salary<input id="desiredSalary" placeholder="e.g. $110,000" /></label>
+          <label>Years of experience<input id="yearsExperience" placeholder="e.g. 1" /></label>
+          <label>Notice period<input id="noticePeriod" placeholder="e.g. 2 weeks" /></label>
+          <label>Available start date<input id="availableStartDate" placeholder="e.g. Immediately" /></label>
+        </div>
+        <div class="grid2">
+          <label>Legally authorized to work (in your target country)?
+            <select id="workAuthorized"><option value="">— unset —</option><option value="true">Yes</option><option value="false">No</option></select>
+          </label>
+          <label>Will you require visa sponsorship?
+            <select id="requiresSponsorship"><option value="">— unset —</option><option value="true">Yes</option><option value="false">No</option></select>
+          </label>
+          <label>Willing to relocate?
+            <select id="willingToRelocate"><option value="">— unset —</option><option value="true">Yes</option><option value="false">No</option></select>
+          </label>
+        </div>
+        <p class="hint">
+          Demographic / EEO questions (gender, race, veteran, disability status, etc.) are never
+          auto-filled by this extension — those are always left for you to answer directly.
+        </p>
+      </section>
+
+      <section id="tab-templates" class="tab hidden">
+        <h2>Answer Style Templates</h2>
+        <p class="hint">
+          Paste a few real questions you've answered before, with your actual answers.
+          The AI uses these as style examples (tone, length, voice) when it drafts answers
+          to new, similar questions — it does not answer questions it has no basis for.
+        </p>
+        <div id="templatesList"></div>
+        <button class="add-btn" data-add="templates">+ Add example Q&amp;A</button>
+      </section>
+
+      <section id="tab-ai" class="tab hidden">
+        <h2>AI Settings — Google Gemini</h2>
+        <p class="hint">
+          Get a free API key at
+          <a href="https://aistudio.google.com/apikey" target="_blank" rel="noopener">aistudio.google.com/apikey</a>.
+          The key is stored only in your browser's local extension storage and is sent only to
+          Google's Gemini API, never anywhere else.
+        </p>
+        <label>Gemini API key<input id="apiKey" type="password" autocomplete="off" /></label>
+        <label>Model
+          <input id="model" list="modelSuggestions" placeholder="gemini-2.5-flash" autocomplete="off" />
+          <datalist id="modelSuggestions">
+            <option value="gemini-2.5-flash"></option>
+            <option value="gemini-2.5-pro"></option>
+            <option value="gemini-flash-latest"></option>
+            <option value="gemini-pro-latest"></option>
+          </datalist>
+        </label>
+        <p class="hint">
+          Type any model ID Google currently supports. Google periodically retires older models
+          (this is why autofill can suddenly stop working) — if that happens, click "Test connection"
+          below; a failure there means it's time to switch to a current model ID from
+          <a href="https://ai.google.dev/gemini-api/docs/models" target="_blank" rel="noopener">the model list</a>.
+        </p>
+        <button id="testKeyBtn" class="secondary-btn">Test connection</button>
+        <span id="testKeyStatus" class="save-status"></span>
+
+        <h3>Advanced</h3>
+        <label>Max AI-drafted fields per page
+          <input id="maxAiFields" type="number" min="1" max="30" step="1" />
+        </label>
+        <p class="hint">
+          How many open-ended questions to send to Gemini in one autofill run. Lower this to save
+          API quota on long forms; raise it if long forms leave too many questions untouched.
+        </p>
+      </section>
+    </main>
+  </div>
+
+  <script src="options.js"></script>
+</body>
+</html>

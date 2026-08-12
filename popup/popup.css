@@ -1,0 +1,121 @@
+:root {
+  color-scheme: light dark;
+  --bg: #ffffff;
+  --fg: #1a1a1a;
+  --muted: #6b7280;
+  --accent: #4f46e5;
+  --accent-fg: #ffffff;
+  --border: #e5e7eb;
+  --ok: #16a34a;
+  --warn: #b45309;
+  --warn-bg: #fffbeb;
+  --ok-bg: #f0fdf4;
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --bg: #16161a;
+    --fg: #f2f2f2;
+    --muted: #9ca3af;
+    --border: #2c2c33;
+    --warn-bg: #2a2210;
+    --ok-bg: #0f2417;
+  }
+}
+
+* { box-sizing: border-box; }
+
+body {
+  width: 320px;
+  margin: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg);
+  color: var(--fg);
+}
+
+header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px 8px;
+}
+
+h1 {
+  font-size: 15px;
+  margin: 0;
+  font-weight: 600;
+}
+
+.icon-btn {
+  background: none;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+  color: var(--muted);
+  padding: 4px;
+  border-radius: 6px;
+}
+.icon-btn:hover { background: var(--border); }
+
+main {
+  padding: 4px 16px 16px;
+}
+
+.status {
+  font-size: 12px;
+  color: var(--muted);
+  margin-bottom: 10px;
+  min-height: 16px;
+}
+
+.primary-btn {
+  width: 100%;
+  padding: 10px 12px;
+  background: var(--accent);
+  color: var(--accent-fg);
+  border: none;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.primary-btn:hover { opacity: 0.92; }
+.primary-btn:disabled { opacity: 0.6; cursor: default; }
+
+.result {
+  margin-top: 12px;
+  padding: 10px 12px;
+  border-radius: 8px;
+  font-size: 12.5px;
+  line-height: 1.5;
+  background: var(--ok-bg);
+  border: 1px solid var(--border);
+}
+.result.warn {
+  background: var(--warn-bg);
+  color: var(--warn);
+}
+.result.error {
+  background: var(--warn-bg);
+  color: #b91c1c;
+}
+.hidden { display: none; }
+
+.hint {
+  font-size: 11px;
+  color: var(--muted);
+  line-height: 1.5;
+  margin-top: 14px;
+}
+
+footer {
+  padding: 10px 16px 14px;
+  border-top: 1px solid var(--border);
+}
+
+footer a {
+  font-size: 12px;
+  color: var(--accent);
+  text-decoration: none;
+}
+footer a:hover { text-decoration: underline; }

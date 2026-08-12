@@ -1,0 +1,34 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8" />
+  <title>Resume Autofill AI</title>
+  <link rel="stylesheet" href="popup.css" />
+</head>
+<body>
+  <header>
+    <h1>Resume Autofill</h1>
+    <button id="openOptions" class="icon-btn" title="Settings">⚙</button>
+  </header>
+
+  <main>
+    <div id="profileStatus" class="status"></div>
+
+    <button id="autofillBtn" class="primary-btn">Autofill this page</button>
+
+    <div id="result" class="result hidden"></div>
+
+    <p class="hint">
+      Fields it's sure about are filled directly (green). Open-ended
+      questions get an AI-drafted answer (amber) — always review those
+      before submitting. Nothing is ever submitted for you.
+    </p>
+  </main>
+
+  <footer>
+    <a href="#" id="editProfileLink">Edit profile & templates</a>
+  </footer>
+
+  <script src="popup.js"></script>
+</body>
+</html>
