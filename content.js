@@ -275,10 +275,19 @@
     const ariaLabel = el.getAttribute("aria-label");
     if (ariaLabel) return cleanText(ariaLabel);
 
+    // aria-labelledby can be a space-separated list of IDs (e.g. Google Forms
+    // points it at both the question heading and a hint/error span) — getElementById
+    // only takes a single ID, so look up and join each one individually.
     const labelledBy = el.getAttribute("aria-labelledby");
     if (labelledBy) {
-      const node = document.getElementById(labelledBy);
-      if (node) return cleanText(node.innerText || node.textContent);
+      const text = labelledBy
+        .split(/\s+/)
+        .map((id) => document.getElementById(id))
+        .filter(Boolean)
+        .map((node) => node.innerText || node.textContent || "")
+        .join(" ");
+      const cleaned = cleanText(text);
+      if (cleaned) return cleaned;
     }
 
     const placeholder = el.getAttribute("placeholder");
