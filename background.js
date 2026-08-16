@@ -36,21 +36,57 @@ chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   return false;
 });
 
-async function testApiKey({ apiKey, model }) {
+// Wraps a generateContent call with the fixes needed for "thinking" models
+// (Gemini 2.5+): thinkingBudget is disabled since these are short, factual
+// form answers that don't need deliberation, and older models that reject
+// the unrecognized field get one retry without it. Also turns a silent empty
+// response (e.g. the model spent its whole token budget thinking and never
+// wrote an answer) into an actionable error instead of a blank string.
+async function callGemini({ apiKey, model, contents, generationConfig }) {
   const url = `${GEMINI_BASE}/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: "Reply with exactly the word OK." }] }],
-      generationConfig: { maxOutputTokens: 10 },
-    }),
-  });
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    throw new Error(data?.error?.message || `Gemini API error (HTTP ${res.status})`);
+  const attempt = (config) =>
+    fetch(url, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ contents, generationConfig: config }),
+    });
+
+  let res = await attempt({ ...generationConfig, thinkingConfig: { thinkingBudget: 0 } });
+  let data = await res.json().catch(() => ({}));
+
+  if (!res.ok && /thinking/i.test(data?.error?.message || "")) {
+    res = await attempt(generationConfig);
+    data = await res.json().catch(() => ({}));
   }
-  return { text: extractText(data) };
+
+  if (!res.ok) {
+    const msg = data?.error?.message || `Gemini API error (HTTP ${res.status})`;
+    if (res.status === 429) throw new Error("Gemini free-tier rate limit hit. Wait a bit and try again.");
+    throw new Error(msg);
+  }
+
+  const text = extractText(data);
+  if (!text) {
+    const reason = data?.candidates?.[0]?.finishReason;
+    if (reason === "MAX_TOKENS") {
+      throw new Error("Gemini ran out of output tokens before writing an answer. Try lowering 'Max AI-drafted fields per page' in AI Settings, or switch to a smaller/faster model.");
+    }
+    if (reason === "SAFETY") {
+      throw new Error("Gemini blocked this response for safety reasons.");
+    }
+    throw new Error(`Gemini returned an empty response${reason ? ` (reason: ${reason})` : ""}.`);
+  }
+  return text;
+}
+
+async function testApiKey({ apiKey, model }) {
+  const text = await callGemini({
+    apiKey,
+    model,
+    contents: [{ role: "user", parts: [{ text: "Reply with exactly the word OK." }] }],
+    generationConfig: { maxOutputTokens: 50 },
+  });
+  return { text };
 }
 
 async function generateAnswers({ questions, profile, templates, pageContext, apiKey, model }) {
@@ -58,29 +94,17 @@ async function generateAnswers({ questions, profile, templates, pageContext, api
   if (!Array.isArray(questions) || questions.length === 0) return { answers: [] };
 
   const prompt = buildPrompt({ questions, profile, templates, pageContext });
-  const url = `${GEMINI_BASE}/${encodeURIComponent(model || "gemini-2.5-flash")}:generateContent?key=${encodeURIComponent(apiKey)}`;
-
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      contents: [{ role: "user", parts: [{ text: prompt }] }],
-      generationConfig: {
-        temperature: 0.6,
-        maxOutputTokens: 2048,
-        responseMimeType: "application/json",
-      },
-    }),
+  const raw = await callGemini({
+    apiKey,
+    model: model || "gemini-2.5-flash",
+    contents: [{ role: "user", parts: [{ text: prompt }] }],
+    generationConfig: {
+      temperature: 0.6,
+      maxOutputTokens: 4096,
+      responseMimeType: "application/json",
+    },
   });
 
-  const data = await res.json().catch(() => ({}));
-  if (!res.ok) {
-    const msg = data?.error?.message || `Gemini API error (HTTP ${res.status})`;
-    if (res.status === 429) throw new Error("Gemini free-tier rate limit hit. Wait a bit and try again.");
-    throw new Error(msg);
-  }
-
-  const raw = extractText(data);
   let parsed;
   try {
     parsed = JSON.parse(raw);
