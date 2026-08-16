@@ -48,6 +48,14 @@
     { key: "relocate", re: /relocat/i, get: (p) => p.preferences.willingToRelocate },
   ];
 
+  // Gate for multi-select checkbox questions worth attempting skill-matching on
+  // (e.g. "Which have you worked with?"). Broad on purpose — the actual safety
+  // net is that fuzzyIncludes() only checks a box when its text genuinely
+  // matches one of the candidate's saved skills, so an over-eager match here
+  // is harmless (it just gets the chance to find nothing).
+  const SKILL_GROUP_RE =
+    /which.*(worked\s*with|used|familiar|experience)|technologies|tools?\s*(you|used|familiar)|skills?\s*(you|have|possess)|select all that apply/i;
+
   chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
     if (message?.action === "AUTOFILL") {
       runAutofill().then((result) => {
@@ -71,6 +79,7 @@
       if (s.filledAI > 0) parts.push(`${s.filledAI} AI-drafted (review before submitting)`);
       if (s.skippedBlocked > 0) parts.push(`${s.skippedBlocked} left for you (sensitive)`);
       if (s.skippedNoData > 0) parts.push(`${s.skippedNoData} left for you (no data)`);
+      if (s.skippedFilled > 0) parts.push(`${s.skippedFilled} left as-is (already filled)`);
       if (s.aiError) parts.push(s.aiError);
       text = parts.join(" · ");
     }
@@ -107,6 +116,7 @@
     let filledDirect = 0;
     let skippedBlocked = 0;
     let skippedNoData = 0;
+    let skippedFilled = 0;
     const llmCandidates = [];
 
     for (const field of fields) {
@@ -119,6 +129,10 @@
         if (rule) {
           const value = rule.get(profile);
           if (value) {
+            if (hasExistingValue(field.el)) {
+              skippedFilled++;
+              continue;
+            }
             if (setValue(field.el, String(value))) {
               flash(field.el, "direct");
               filledDirect++;
@@ -133,20 +147,38 @@
         if (isOpenEndedCandidate(field)) {
           llmCandidates.push(field);
         }
-      } else if (field.kind === "boolGroup") {
-        const rule = BOOLEAN_GROUPS.find((r) => r.re.test(field.label));
-        if (rule) {
-          const val = rule.get(profile);
+      } else if (field.kind === "choiceGroup") {
+        const boolRule = BOOLEAN_GROUPS.find((r) => r.re.test(field.label));
+        const isSkillGroup = field.multi && SKILL_GROUP_RE.test(field.label);
+        if (!boolRule && !isSkillGroup) continue;
+
+        if (field.options.some((o) => o.isChecked())) {
+          skippedFilled++;
+          continue;
+        }
+
+        if (boolRule) {
+          const val = boolRule.get(profile);
           if (val === true || val === false) {
             const target = pickYesNo(field.options, val);
             if (target) {
-              target.checked = true;
-              target.dispatchEvent(new Event("click", { bubbles: true }));
-              target.dispatchEvent(new Event("change", { bubbles: true }));
-              flash(target, "direct");
+              target.check();
+              flash(target.el, "direct");
               filledDirect++;
             }
           }
+        } else {
+          const skills = flattenSkills(profile);
+          let matched = false;
+          for (const opt of field.options) {
+            if (isNoneOption(opt.label)) continue;
+            if (skills.some((s) => fuzzyIncludes(opt.label, s))) {
+              opt.check();
+              flash(opt.el, "direct");
+              matched = true;
+            }
+          }
+          if (matched) filledDirect++;
         }
       }
     }
@@ -201,6 +233,7 @@
         filledAI,
         skippedBlocked,
         skippedNoData,
+        skippedFilled,
         llmQueued: llmCandidates.length,
         llmFilled: capped.length,
         aiError,
@@ -220,10 +253,41 @@
     const yesRe = /^yes$/i;
     const noRe = /^no$/i;
     for (const opt of options) {
-      if (wantYes && yesRe.test(opt.label.trim())) return opt.el;
-      if (!wantYes && noRe.test(opt.label.trim())) return opt.el;
+      if (wantYes && yesRe.test(opt.label.trim())) return opt;
+      if (!wantYes && noRe.test(opt.label.trim())) return opt;
     }
     return null;
+  }
+
+  function hasExistingValue(el) {
+    if (el.tagName === "SELECT") return !!el.value && el.selectedIndex > 0;
+    return !!(el.value && el.value.trim().length > 0);
+  }
+
+  function flattenSkills(profile) {
+    const skills = profile.skills || {};
+    return Object.values(skills).flat().filter(Boolean);
+  }
+
+  function isNoneOption(label) {
+    return /^(none|n\/a|not\s*applicable|other)s?$/i.test((label || "").trim());
+  }
+
+  function escapeRegExp(str) {
+    return str.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  }
+
+  // Exact-ish skill/option match, contains-either-way for longer terms. Short
+  // tokens (R, Go, C#) require a word boundary so e.g. skill "R" doesn't
+  // match inside an unrelated option like "Marketing".
+  function fuzzyIncludes(hay, needle) {
+    const h = (hay || "").toLowerCase();
+    const n = (needle || "").toLowerCase().trim();
+    if (!n) return false;
+    if (n.length <= 2) {
+      return new RegExp(`(^|[^a-z0-9+#])${escapeRegExp(n)}([^a-z0-9+#]|$)`, "i").test(h);
+    }
+    return h.includes(n) || n.includes(h);
   }
 
   function discoverFields() {
@@ -242,8 +306,8 @@
         if (group.length < 2) continue; // single checkbox (e.g. consent) — leave for the user
         seenRadioGroups.add(name);
         const label = labelForGroup(group[0]) || "";
-        const options = Array.from(group).map((g) => ({ el: g, label: labelForField(g) || g.value || "" }));
-        results.push({ kind: "boolGroup", label, options });
+        const options = Array.from(group).map((g) => makeOption(g, labelForField(g) || g.value || ""));
+        results.push({ kind: "choiceGroup", label, options, multi: type === "checkbox" });
         continue;
       }
 
@@ -254,7 +318,81 @@
       if (!label) continue;
       results.push({ kind: "text", el, label });
     }
+
+    // ARIA-widget choice groups: some form platforms (Google Forms among them)
+    // render multiple-choice / checkbox questions as styled divs with
+    // role="radio"/"checkbox" and aria-checked instead of native <input>
+    // elements, so the loop above never sees them at all.
+    const ariaOptions = Array.from(document.querySelectorAll('[role="radio"], [role="checkbox"]')).filter(
+      (el) => el.tagName !== "INPUT" && isVisible(el) && el.getAttribute("aria-disabled") !== "true"
+    );
+    const groups = new Map();
+    for (const el of ariaOptions) {
+      const container = groupContainerFor(el);
+      if (!container) continue;
+      if (!groups.has(container)) groups.set(container, []);
+      groups.get(container).push(el);
+    }
+    for (const [container, els] of groups) {
+      if (els.length < 2) continue; // stray single widget — leave for the user
+      const label = ariaGroupLabel(container);
+      if (!label) continue;
+      const options = els.map((el) => makeOption(el, ariaOptionLabel(el)));
+      results.push({ kind: "choiceGroup", label, options, multi: els[0].getAttribute("role") === "checkbox" });
+    }
+
     return results;
+  }
+
+  // Scopes an ARIA option to the single question it belongs to. Google Forms
+  // wraps every question (of any type) in its own role="listitem", which is a
+  // much safer boundary than climbing to the nearest role="list"/"group" —
+  // those can span the entire form.
+  function groupContainerFor(el) {
+    return (
+      el.closest('[role="listitem"]') ||
+      el.closest('fieldset, [role="radiogroup"], [role="group"], [role="list"]') ||
+      el.parentElement?.parentElement ||
+      el.parentElement ||
+      null
+    );
+  }
+
+  function ariaGroupLabel(container) {
+    const heading = container.querySelector('[role="heading"]');
+    if (heading) {
+      const text = cleanText(heading.innerText || heading.textContent);
+      if (text) return text;
+    }
+    const firstLine = (container.innerText || container.textContent || "").split("\n")[0];
+    return cleanText(firstLine);
+  }
+
+  function ariaOptionLabel(el) {
+    return cleanText(
+      el.getAttribute("aria-label") || el.getAttribute("data-answer-value") || el.getAttribute("data-value") || el.innerText || el.textContent || ""
+    );
+  }
+
+  // Wraps a native <input> or an ARIA role="radio"/"checkbox" div behind the
+  // same interface, since ARIA widgets have no real .checked property — their
+  // state lives in aria-checked and is only changed by a genuine click event.
+  function makeOption(el, label) {
+    const isAria = el.tagName !== "INPUT";
+    return {
+      el,
+      label,
+      isChecked: () => (isAria ? el.getAttribute("aria-checked") === "true" : el.checked),
+      check: () => {
+        if (isAria) {
+          if (el.getAttribute("aria-checked") !== "true") el.click();
+        } else if (!el.checked) {
+          el.checked = true;
+          el.dispatchEvent(new Event("click", { bubbles: true }));
+          el.dispatchEvent(new Event("change", { bubbles: true }));
+        }
+      },
+    };
   }
 
   function isVisible(el) {

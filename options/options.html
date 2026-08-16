@@ -15,6 +15,7 @@
       <button class="nav-item" data-tab="skills">Skills</button>
       <button class="nav-item" data-tab="preferences">Application Preferences</button>
       <button class="nav-item" data-tab="templates">Answer Style Templates</button>
+      <button class="nav-item" data-tab="profiles">Profiles</button>
       <button class="nav-item" data-tab="ai">AI Settings</button>
       <div class="save-row">
         <button id="saveBtn" class="primary-btn">Save changes</button>
@@ -118,6 +119,30 @@
         </p>
         <div id="templatesList"></div>
         <button class="add-btn" data-add="templates">+ Add example Q&amp;A</button>
+      </section>
+
+      <section id="tab-profiles" class="tab hidden">
+        <h2>Profiles</h2>
+        <p class="hint">
+          Save multiple full copies of your profile — e.g. one tuned for ML/AI roles, one for
+          general software engineering — if you apply to different kinds of positions with
+          different resumes. Active profile: <strong id="activeProfileLabel">Default</strong>.
+          The popup will suggest switching profiles when a job page's title/description looks
+          like a better match for a saved preset.
+        </p>
+
+        <div class="card">
+          <label>Preset name<input id="newPresetName" placeholder="e.g. ML Engineer" /></label>
+          <label>Resume filename to attach (reminder only — shown in the popup)
+            <input id="newPresetResumeFileName" placeholder="e.g. Sneh_ML_Engineer_Resume.pdf" />
+          </label>
+          <label>Keywords for job-page matching (comma-separated, optional)
+            <input id="newPresetKeywords" placeholder="leave blank to auto-detect from skills &amp; headline" />
+          </label>
+          <button id="savePresetBtn" class="add-btn">+ Save current profile as a preset</button>
+        </div>
+
+        <div id="presetsList"></div>
       </section>
 
       <section id="tab-ai" class="tab hidden">

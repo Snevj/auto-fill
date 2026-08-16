@@ -20,11 +20,19 @@ using Gemini's free tier, styled after example answers you provide.
   **Max AI-drafted fields per page** in AI Settings (default 8).
 - **Left for you, no field highlighted:** demographic/EEO questions (gender,
   race, veteran, disability status, etc.), passwords, file uploads, submit
-  buttons, and questions the AI has no factual basis to answer (e.g. "How did
-  you hear about us?", requisition/job IDs) — the extension won't fabricate an
-  answer to those. Browsers also don't allow scripts to set file inputs, so
-  **resume/cover letter uploads always need to be attached manually.**
-- **Run it without opening the popup:** press **Ctrl+Shift+F** (**Cmd+Shift+F**
+  buttons, questions the AI has no factual basis to answer (e.g. "How did
+  you hear about us?", requisition/job IDs), and any field that already has an
+  answer in it — nothing overwrites what you've already typed or selected.
+  Browsers also don't allow scripts to set file inputs, so **resume/cover
+  letter uploads always need to be attached manually.**
+- **Multiple-choice and checkbox questions:** Yes/No questions (work
+  authorization, sponsorship, relocation) get answered directly, and
+  multi-select checkbox questions like "Which of these have you worked
+  with?" get checked based on your saved skills (leaving "None"/"Other" and
+  anything that doesn't match alone). This works both for plain HTML
+  forms and for platforms like Google Forms, which render these as styled
+  widgets instead of native checkboxes/radios.
+- **Run it without opening the popup:** press **Ctrl+Shift+F** (**Cmd+Shift+G**
   on Mac) on any page to autofill it directly — a small toast in the
   bottom-right corner reports what happened. Change the shortcut at
   `chrome://extensions/shortcuts`.
@@ -62,11 +70,25 @@ using Gemini's free tier, styled after example answers you provide.
    - **Import backup** restores from that file, e.g. on a new machine or a
      second browser profile.
 
+5. **Set up multiple profiles for different kinds of roles (optional)**
+   - If you apply with more than one resume (e.g. an "ML Engineer" version
+     and a "Backend Engineer" version), fill in the profile for one of them
+     and go to the **Profiles** tab → **+ Save current profile as a preset**.
+     Give it a name and, optionally, the exact filename of the matching
+     resume PDF.
+   - Repeat for your other profile(s). Switch between them any time from the
+     **Profiles** tab, or let the popup suggest a switch automatically — see
+     below.
+
 ## Using it
 
 1. Open any job application form
-2. Click the extension icon → **Autofill this page**
-3. Green fields were filled directly; amber fields were AI-drafted — read
+2. If you've saved more than one profile preset, the popup checks the page's
+   title/description against each one and — if a different preset looks
+   like a clearly better match — offers a **Switch** button. It also shows
+   which resume filename to attach, if you saved one for the active preset.
+3. Click the extension icon → **Autofill this page**
+4. Green fields were filled directly; amber fields were AI-drafted — read
    them, edit anything, then submit the form yourself as normal
 
 ## Notes & limits

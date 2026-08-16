@@ -108,12 +108,12 @@ const DEFAULT_PROFILE = {
 
 const DEFAULT_SETTINGS = { apiKey: "", model: "gemini-2.5-flash", maxAiFields: 8 };
 
-let state = { profile: null, templates: [], settings: { ...DEFAULT_SETTINGS } };
+let state = { profile: null, templates: [], settings: { ...DEFAULT_SETTINGS }, presets: [], activeProfileName: "Default" };
 
 init();
 
 async function init() {
-  const stored = await chrome.storage.local.get(["profile", "templates", "settings"]);
+  const stored = await chrome.storage.local.get(["profile", "templates", "settings", "presets", "activeProfileName"]);
   state.profile = stored.profile || structuredClone(DEFAULT_PROFILE);
   state.profile.experience ||= [];
   state.profile.activities ||= [];
@@ -121,6 +121,8 @@ async function init() {
   state.profile.projects ||= [];
   state.templates = stored.templates || [];
   state.settings = { ...DEFAULT_SETTINGS, ...(stored.settings || {}) };
+  state.presets = Array.isArray(stored.presets) ? stored.presets : [];
+  state.activeProfileName = stored.activeProfileName || "Default";
 
   bindTabs();
   fillPersonalForm();
@@ -131,11 +133,13 @@ async function init() {
   fillSkillsForm();
   fillPreferencesForm();
   renderTemplates();
+  renderPresets();
   fillAiForm();
   bindAddButtons();
   bindSave();
   bindTestKey();
   bindExportImport();
+  bindPresets();
 }
 
 function bindTabs() {
@@ -386,6 +390,85 @@ function renderTemplates() {
   });
 }
 
+// ---- Profiles (presets) ----
+function renderPresets() {
+  document.getElementById("activeProfileLabel").textContent = state.activeProfileName;
+
+  const list = document.getElementById("presetsList");
+  list.innerHTML = "";
+  state.presets.forEach((preset, i) => {
+    const card = document.createElement("div");
+    card.className = "card";
+    const isActive = preset.name === state.activeProfileName;
+    card.innerHTML = `
+      <button class="remove-btn" data-remove="presets:${i}">Remove</button>
+      <strong>${esc(preset.name)}</strong>${isActive ? " (active)" : ""}
+      <p class="hint" style="margin:6px 0">
+        ${preset.resumeFileName ? `Resume: ${esc(preset.resumeFileName)}` : "No resume filename saved"}
+        ${preset.keywords ? ` · Keywords: ${esc(preset.keywords)}` : " · Keywords: auto (from skills/headline)"}
+      </p>
+      <button class="secondary-btn" data-load="${i}" ${isActive ? "disabled" : ""}>Load this profile</button>`;
+    list.appendChild(card);
+  });
+  list.querySelectorAll("[data-load]").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.load);
+      loadPreset(state.presets[idx]);
+    });
+  });
+  list.querySelectorAll("[data-remove^='presets:']").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.dataset.remove.split(":")[1]);
+      state.presets.splice(idx, 1);
+      chrome.storage.local.set({ presets: state.presets });
+      renderPresets();
+    });
+  });
+}
+
+function loadPreset(preset) {
+  if (!preset) return;
+  if (!confirm(`Load "${preset.name}"? This replaces the profile fields currently shown (unsaved edits will be lost).`)) return;
+  state.profile = structuredClone(preset.profile);
+  state.profile.experience ||= [];
+  state.profile.activities ||= [];
+  state.profile.education ||= [];
+  state.profile.projects ||= [];
+  state.activeProfileName = preset.name;
+
+  fillPersonalForm();
+  renderEducation();
+  renderExperience();
+  renderActivities();
+  renderProjects();
+  fillSkillsForm();
+  fillPreferencesForm();
+  renderPresets();
+
+  chrome.storage.local.set({ profile: state.profile, activeProfileName: state.activeProfileName });
+}
+
+function bindPresets() {
+  document.getElementById("savePresetBtn").addEventListener("click", () => {
+    readAllForms();
+    const name = document.getElementById("newPresetName").value.trim();
+    if (!name) {
+      alert("Give this preset a name first.");
+      return;
+    }
+    const resumeFileName = document.getElementById("newPresetResumeFileName").value.trim();
+    const keywords = document.getElementById("newPresetKeywords").value.trim();
+    state.presets.push({ name, resumeFileName, keywords, profile: structuredClone(state.profile) });
+    state.activeProfileName = name;
+    chrome.storage.local.set({ presets: state.presets, activeProfileName: state.activeProfileName });
+
+    document.getElementById("newPresetName").value = "";
+    document.getElementById("newPresetResumeFileName").value = "";
+    document.getElementById("newPresetKeywords").value = "";
+    renderPresets();
+  });
+}
+
 // ---- AI settings ----
 function fillAiForm() {
   set("apiKey", state.settings.apiKey || "");
@@ -473,6 +556,8 @@ function bindExportImport() {
       profile: state.profile,
       templates: state.templates,
       settings: state.settings,
+      presets: state.presets,
+      activeProfileName: state.activeProfileName,
     };
     const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json" });
     const url = URL.createObjectURL(blob);
@@ -503,7 +588,15 @@ function bindExportImport() {
       state.profile.projects ||= [];
       state.templates = Array.isArray(data.templates) ? data.templates : [];
       state.settings = { ...DEFAULT_SETTINGS, ...(data.settings || {}) };
-      await chrome.storage.local.set({ profile: state.profile, templates: state.templates, settings: state.settings });
+      state.presets = Array.isArray(data.presets) ? data.presets : [];
+      state.activeProfileName = data.activeProfileName || "Default";
+      await chrome.storage.local.set({
+        profile: state.profile,
+        templates: state.templates,
+        settings: state.settings,
+        presets: state.presets,
+        activeProfileName: state.activeProfileName,
+      });
 
       fillPersonalForm();
       renderEducation();
@@ -513,6 +606,7 @@ function bindExportImport() {
       fillSkillsForm();
       fillPreferencesForm();
       renderTemplates();
+      renderPresets();
       fillAiForm();
 
       status.textContent = "Imported and saved.";
